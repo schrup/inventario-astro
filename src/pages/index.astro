@@ -1,11 +1,222 @@
 ---
-import Welcome from '../components/Welcome.astro';
 import Layout from '../layouts/Layout.astro';
-
-// Welcome to Astro! Wondering what to do next? Check out the Astro documentation at https://docs.astro.build
-// Don't want to use any of this? Delete everything in this file, the `assets`, `components`, and `layouts` directories, and start fresh.
+import FormularioProducto from '../components/FormularioProducto.astro';
+import Producto from '../components/Producto.astro';
+import Resumen from '../components/Resumen.astro';
 ---
 
 <Layout>
-	<Welcome />
+	<main class="mx-auto flex w-[min(100%-2rem,64rem)] flex-col gap-10 py-8 pb-16">
+		<header class="flex flex-col gap-1 text-center">
+			<h1 class="text-2xl font-bold sm:text-3xl">Control de inventario</h1>
+			<p class="m-0 text-slate-500">Registra tus referencias y marca cada venta durante la feria.</p>
+		</header>
+
+		<Resumen />
+
+		<FormularioProducto />
+
+		<section aria-label="Listado de referencias">
+			<h2 class="mb-3 text-lg font-semibold">Referencias</h2>
+			<p
+				id="inventario-vacio"
+				class="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500"
+			>
+				Aún no has agregado referencias al inventario.
+			</p>
+			<div
+				id="lista-productos"
+				class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4"
+			>
+			</div>
+		</section>
+	</main>
+
+	<Producto />
+
+<script>
+	import { supabase } from '../lib/supabase';
+
+	/** @type {{ id: string, nombre: string, cantidadInicial: number, vendidos: number }[]} */
+	let inventario = [];
+
+	const formulario = document.getElementById('form-producto');
+	const inputNombre = document.getElementById('nombre');
+	const inputCantidad = document.getElementById('cantidad');
+	const listaProductos = document.getElementById('lista-productos');
+	const inventarioVacio = document.getElementById('inventario-vacio');
+	const plantilla = document.getElementById('producto-template');
+	const totalInicial = document.getElementById('total-inicial');
+	const totalVendidos = document.getElementById('total-vendidos');
+	const totalDisponibles = document.getElementById('total-disponibles');
+
+	const calcularDisponibles = (producto) => producto.cantidadInicial - producto.vendidos;
+
+	// Lee todo desde Supabase y vuelve a dibujar
+	const cargarInventario = async () => {
+		const { data, error } = await supabase
+			.from('products')
+			.select('id, reference, initial_quantity, current_stock')
+			.order('created_at', { ascending: true });
+
+		if (error) {
+			console.error(error);
+			alert('No se pudo cargar el inventario.');
+			return;
+		}
+
+		inventario = data.map((p) => ({
+			id: p.id,
+			nombre: p.reference,
+			cantidadInicial: p.initial_quantity,
+			vendidos: p.initial_quantity - p.current_stock,
+		}));
+		renderizar();
+	};
+
+	const agregarProducto = async (nombre, cantidadInicial) => {
+		const { error } = await supabase.from('products').insert({
+			reference: nombre,
+			initial_quantity: cantidadInicial,
+			current_stock: cantidadInicial,
+		});
+
+		if (error) {
+			// 23505 = violación de la restricción unique (referencia repetida)
+			if (error.code === '23505') {
+				alert(`Ya existe una referencia llamada "${nombre}".`);
+			} else {
+				console.error(error);
+				alert('No se pudo agregar la referencia.');
+			}
+			return false;
+		}
+
+		await cargarInventario();
+		return true;
+	};
+
+	const eliminarReferencia = async (id) => {
+		const { error } = await supabase.from('products').delete().eq('id', id);
+		if (error) {
+			console.error(error);
+			alert('No se pudo eliminar la referencia.');
+			return;
+		}
+		await cargarInventario();
+	};
+
+	const registrarVenta = async (id) => {
+		const { error } = await supabase.rpc('register_sale', {
+			p_product_id: id,
+			p_quantity: 1,
+		});
+
+		if (error) {
+			console.error(error);
+			alert(
+				error.message.includes('Stock insuficiente')
+					? 'No quedan unidades disponibles de esta referencia.'
+					: 'No se pudo registrar la venta.'
+			);
+		}
+		// Recargamos siempre: si falló por stock, la pantalla se corrige con el dato real
+		await cargarInventario();
+	};
+
+	const renderizarResumen = () => {
+		const inicial = inventario.reduce((suma, p) => suma + p.cantidadInicial, 0);
+		const vendidos = inventario.reduce((suma, p) => suma + p.vendidos, 0);
+		totalInicial.textContent = String(inicial);
+		totalVendidos.textContent = String(vendidos);
+		totalDisponibles.textContent = String(inicial - vendidos);
+	};
+
+	const renderizarProducto = (producto) => {
+		const disponibles = calcularDisponibles(producto);
+		const nodo = plantilla.content.firstElementChild.cloneNode(true);
+
+		nodo.dataset.agotado = disponibles <= 0 ? 'true' : 'false';
+		nodo.querySelector('.producto__nombre').textContent = producto.nombre;
+		nodo.querySelector('.producto__inicial').textContent = String(producto.cantidadInicial);
+		nodo.querySelector('.producto__vendidos').textContent = String(producto.vendidos);
+		nodo.querySelector('.producto__disponibles').textContent = String(disponibles);
+
+		const botonVender = nodo.querySelector('.producto__vender');
+		botonVender.disabled = disponibles <= 0;
+		botonVender.addEventListener('click', async () => {
+			botonVender.disabled = true; // evita doble clic mientras responde el servidor
+			await registrarVenta(producto.id);
+		});
+
+		nodo.querySelector('.producto__eliminar').addEventListener('click', async () => {
+			if (confirm(`¿Eliminar "${producto.nombre}" del inventario?`)) {
+				await eliminarReferencia(producto.id);
+			}
+		});
+
+		return nodo;
+	};
+
+	const renderizar = () => {
+		listaProductos.innerHTML = '';
+		inventario.forEach((producto) => listaProductos.appendChild(renderizarProducto(producto)));
+		inventarioVacio.hidden = inventario.length > 0;
+		renderizarResumen();
+	};
+
+	formulario.addEventListener('submit', async (evento) => {
+		evento.preventDefault();
+
+		const nombre = inputNombre.value.trim();
+		const cantidadInicial = Math.floor(Number(inputCantidad.value));
+
+		if (!nombre || !Number.isFinite(cantidadInicial) || cantidadInicial < 0) return;
+
+		const boton = formulario.querySelector('button[type="submit"]');
+		boton.disabled = true;
+		const guardado = await agregarProducto(nombre, cantidadInicial);
+		boton.disabled = false;
+
+		if (guardado) {
+			formulario.reset();
+			inputCantidad.value = '1';
+			inputNombre.focus();
+		}
+	});
+
+  const desdeFila = (p) => ({
+	  id: p.id,
+	  nombre: p.reference,
+	  cantidadInicial: p.initial_quantity,
+	  vendidos: p.initial_quantity - p.current_stock,
+  });
+
+  // Aplica un cambio que llegó desde Supabase. Usa valores absolutos,
+  // así que recibir dos veces el mismo cambio no duplica nada.
+    const aplicarCambio = (payload) => {
+	    if (payload.eventType === 'DELETE') {
+		    inventario = inventario.filter((p) => p.id !== payload.old.id);
+	    } else {
+		      const producto = desdeFila(payload.new);
+		      const indice = inventario.findIndex((p) => p.id === producto.id);
+		      if (indice === -1) inventario.push(producto);
+		      else inventario[indice] = producto;
+	    }
+	    renderizar();
+  };
+
+supabase
+	.channel('inventario')
+	.on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, aplicarCambio)
+	.subscribe();
+
+// Si el celular estuvo bloqueado o sin señal, se pudo perder algún aviso:
+// al volver a la pestaña se vuelve a leer todo.
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible') cargarInventario();
+    });
+
+	cargarInventario();
+</script>
 </Layout>

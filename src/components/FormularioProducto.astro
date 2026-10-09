@@ -1,0 +1,41 @@
+---
+---
+
+<form
+	id="form-producto"
+	class="grid items-end gap-3 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm md:grid-cols-[2fr_1fr_auto]"
+	autocomplete="off"
+>
+	<label class="flex flex-col gap-1.5">
+		<span class="text-sm font-semibold text-slate-500">Referencia</span>
+		<input
+			type="text"
+			id="nombre"
+			name="nombre"
+			placeholder="Ej: Bioaqua Arroz"
+			maxlength="60"
+			required
+			class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+		/>
+	</label>
+	<label class="flex flex-col gap-1.5">
+		<span class="text-sm font-semibold text-slate-500">Cantidad inicial</span>
+		<input
+			type="number"
+			id="cantidad"
+			name="cantidad"
+			min="0"
+			step="1"
+			inputmode="numeric"
+			value="1"
+			required
+			class="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 outline-none transition focus:border-indigo-500 focus:bg-white focus:ring-2 focus:ring-indigo-500/20"
+		/>
+	</label>
+	<button
+		type="submit"
+		class="rounded-xl bg-indigo-600 px-6 py-2.5 font-semibold text-white transition hover:bg-indigo-700"
+	>
+		Agregar
+	</button>
+</form>
