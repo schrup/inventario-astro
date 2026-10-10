@@ -3,220 +3,484 @@ import Layout from '../layouts/Layout.astro';
 import FormularioProducto from '../components/FormularioProducto.astro';
 import Producto from '../components/Producto.astro';
 import Resumen from '../components/Resumen.astro';
+import Buscador from '../components/Buscador.astro';
+import Contabilidad from '../components/Contabilidad.astro';
+import ConfirmarEliminar from '../components/ConfirmarEliminar.astro';
 ---
 
 <Layout>
-	<main class="mx-auto flex w-[min(100%-2rem,64rem)] flex-col gap-10 py-8 pb-16">
-		<header class="flex flex-col gap-1 text-center">
-			<h1 class="text-2xl font-bold sm:text-3xl">Control de inventario</h1>
-			<p class="m-0 text-slate-500">Registra tus referencias y marca cada venta durante la feria.</p>
-		</header>
-
-		<Resumen />
-
-		<FormularioProducto />
-
-		<section aria-label="Listado de referencias">
-			<h2 class="mb-3 text-lg font-semibold">Referencias</h2>
-			<p
-				id="inventario-vacio"
-				class="rounded-2xl border border-dashed border-slate-300 bg-white p-6 text-center text-slate-500"
+	<!-- Login -->
+	<div id="login" hidden>
+		<form
+			id="form-login"
+			class="mx-auto mt-20 flex w-[min(100%-2rem,24rem)] flex-col gap-4 rounded-lg border border-stone-200 bg-white p-5"
+		>
+			<h1 class="text-xl font-semibold tracking-tight text-stone-900">Iniciar sesión</h1>
+			<label class="flex flex-col gap-1.5">
+				<span class="text-xs font-medium text-stone-500">Correo</span>
+				<input
+					id="login-email"
+					type="email"
+					required
+					autocomplete="username"
+					class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 outline-none transition focus:border-stone-900"
+				/>
+			</label>
+			<label class="flex flex-col gap-1.5">
+				<span class="text-xs font-medium text-stone-500">Contraseña</span>
+				<input
+					id="login-password"
+					type="password"
+					required
+					autocomplete="current-password"
+					class="w-full rounded-lg border border-stone-300 bg-white px-3 py-2.5 outline-none transition focus:border-stone-900"
+				/>
+			</label>
+			<p id="error-login" class="m-0 min-h-5 text-sm text-rose-600"></p>
+			<button
+				id="boton-login"
+				type="submit"
+				class="rounded-lg bg-linear-to-br from-indigo-600 to-violet-600 px-6 py-2.5 font-semibold text-white transition hover:from-indigo-700 hover:to-violet-700 disabled:cursor-not-allowed disabled:opacity-60"
 			>
-				Aún no has agregado referencias al inventario.
-			</p>
-			<div
-				id="lista-productos"
-				class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4"
-			>
-			</div>
-		</section>
-	</main>
+				Entrar
+			</button>
+		</form>
+	</div>
+
+
+  <!-- Aplicación -->
+	<div id="app" hidden>
+		<main class="mx-auto flex w-[min(100%-2rem,64rem)] flex-col gap-6 py-6 pb-16 sm:py-10">
+			<header class="flex items-baseline justify-between gap-4 border-b border-stone-200 pb-4">
+				<h1 class="text-xl font-semibold tracking-tight text-stone-900 sm:text-2xl">
+					Control de inventario
+				</h1>
+				<div class="flex items-baseline gap-4">
+					<p class="m-0 hidden text-sm text-stone-500 sm:block">Marca cada venta durante la feria</p>
+					<button
+						id="btn-salir"
+						type="button"
+						class="text-sm text-stone-500 underline hover:text-stone-900"
+					>
+						Salir
+					</button>
+				</div>
+			</header>
+
+			<Resumen />
+
+			<Contabilidad />
+
+			<FormularioProducto />
+
+			<section aria-label="Listado de referencias">
+				<div class="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+					<h2 class="text-sm font-semibold tracking-wide text-stone-500 uppercase">Referencias</h2>
+					<Buscador />
+				</div>
+				<p
+					id="inventario-vacio"
+					class="rounded-lg border border-dashed border-stone-300 p-6 text-center text-sm text-stone-500"
+				>
+					Aún no has agregado referencias al inventario.
+				</p>
+				<div
+					id="lista-productos"
+					class="grid grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] gap-4"
+				>
+				</div>
+			</section>
+		</main>
+	</div>
 
 	<Producto />
+	<ConfirmarEliminar />
 
-<script>
-	import { supabase } from '../lib/supabase';
+	<script>
+		import { supabase } from '../lib/supabase';
 
-	/** @type {{ id: string, nombre: string, cantidadInicial: number, vendidos: number }[]} */
-	let inventario = [];
+		/** @type {{ id: string, nombre: string, cantidadInicial: number, vendidos: number, precioCompra: number | null, precioVenta: number | null }[]} */
+		let inventario = [];
 
-	const formulario = document.getElementById('form-producto');
-	const inputNombre = document.getElementById('nombre');
-	const inputCantidad = document.getElementById('cantidad');
-	const listaProductos = document.getElementById('lista-productos');
-	const inventarioVacio = document.getElementById('inventario-vacio');
-	const plantilla = document.getElementById('producto-template');
-	const totalInicial = document.getElementById('total-inicial');
-	const totalVendidos = document.getElementById('total-vendidos');
-	const totalDisponibles = document.getElementById('total-disponibles');
+		// --- Referencias al DOM ---
+		const formulario = document.getElementById('form-producto');
+		const inputNombre = document.getElementById('nombre');
+		const inputCantidad = document.getElementById('cantidad');
+		const inputPrecioCompra = document.getElementById('precio-compra');
+		const inputPrecioVenta = document.getElementById('precio-venta');
+		const listaProductos = document.getElementById('lista-productos');
+		const inventarioVacio = document.getElementById('inventario-vacio');
+		const plantilla = document.getElementById('producto-template');
+		const totalInicial = document.getElementById('total-inicial');
+		const totalVendidos = document.getElementById('total-vendidos');
+		const totalDisponibles = document.getElementById('total-disponibles');
+		const totalInversion = document.getElementById('total-inversion');
+		const totalVentas = document.getElementById('total-ventas');
+		const totalRecuperacion = document.getElementById('total-recuperacion');
+		const totalRentabilidad = document.getElementById('total-rentabilidad');
+		const buscador = document.getElementById('buscador');
+		const selectorOrden = document.getElementById('orden');
+		const dialogoEliminar = document.getElementById('dialogo-eliminar');
+		const textoEliminar = document.getElementById('dialogo-eliminar-texto');
 
-	const calcularDisponibles = (producto) => producto.cantidadInicial - producto.vendidos;
+		let filtro = '';
+		let orden = 'asc';
 
-	// Lee todo desde Supabase y vuelve a dibujar
-	const cargarInventario = async () => {
-		const { data, error } = await supabase
-			.from('products')
-			.select('id, reference, initial_quantity, current_stock')
-			.order('created_at', { ascending: true });
+		// --- Formato de pesos con separador de miles ---
+		const SEPARADOR_MILES = '.'; // cámbialo por ',' si prefieres 15,000
 
-		if (error) {
-			console.error(error);
-			alert('No se pudo cargar el inventario.');
-			return;
-		}
+		const soloDigitos = (texto) => texto.replace(/\D/g, '');
 
-		inventario = data.map((p) => ({
+		const conMiles = (digitos) => digitos.replace(/\B(?=(\d{3})+(?!\d))/g, SEPARADOR_MILES);
+
+		const mostrarPrecio = (valor) =>
+			valor === null || valor === undefined ? '—' : `$ ${conMiles(String(Math.round(valor)))}`;
+
+		// Versión que admite negativos (el signo va antes del $)
+		const mostrarDinero = (valor) =>
+			`${valor < 0 ? '-' : ''}$ ${conMiles(String(Math.abs(Math.round(valor))))}`;
+
+		// Quita los puntos y devuelve el número real; vacío = null (sin precio)
+		const leerPrecio = (input) => {
+			const digitos = soloDigitos(input.value);
+			return digitos === '' ? null : Number(digitos);
+		};
+
+		// Da formato de miles mientras se escribe, conservando la posición del cursor
+		const activarFormatoMoneda = (input) => {
+			input.addEventListener('input', () => {
+				const posicion = input.selectionStart ?? input.value.length;
+				const digitosAntes = soloDigitos(input.value.slice(0, posicion)).length;
+				const digitos = soloDigitos(input.value).slice(0, 10); // límite de la columna
+
+				input.value = conMiles(digitos);
+
+				let nueva = digitosAntes === 0 ? 0 : input.value.length;
+				let cuenta = 0;
+				for (let i = 0; i < input.value.length && digitosAntes > 0; i++) {
+					if (/\d/.test(input.value[i])) cuenta++;
+					if (cuenta === digitosAntes) {
+						nueva = i + 1;
+						break;
+					}
+				}
+				input.setSelectionRange(nueva, nueva);
+			});
+		};
+
+		activarFormatoMoneda(inputPrecioCompra);
+		activarFormatoMoneda(inputPrecioVenta);
+
+		// --- Datos ---
+		const calcularDisponibles = (producto) => producto.cantidadInicial - producto.vendidos;
+
+		const desdeFila = (p) => ({
 			id: p.id,
 			nombre: p.reference,
 			cantidadInicial: p.initial_quantity,
 			vendidos: p.initial_quantity - p.current_stock,
-		}));
-		renderizar();
-	};
-
-	const agregarProducto = async (nombre, cantidadInicial) => {
-		const { error } = await supabase.from('products').insert({
-			reference: nombre,
-			initial_quantity: cantidadInicial,
-			current_stock: cantidadInicial,
+			precioCompra: p.purchase_price,
+			precioVenta: p.sale_price,
 		});
 
-		if (error) {
-			// 23505 = violación de la restricción unique (referencia repetida)
-			if (error.code === '23505') {
-				alert(`Ya existe una referencia llamada "${nombre}".`);
-			} else {
+		// Filtra por texto y ordena alfabéticamente según el selector
+		const productosVisibles = () => {
+			const texto = filtro.trim().toLowerCase();
+			return inventario
+				.filter((producto) => producto.nombre.toLowerCase().includes(texto))
+				.sort((a, b) => {
+					const comparacion = a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' });
+					return orden === 'desc' ? -comparacion : comparacion;
+				});
+		};
+
+		// Lee todo desde Supabase y vuelve a dibujar
+		const cargarInventario = async () => {
+			const { data, error } = await supabase
+				.from('products')
+				.select('id, reference, initial_quantity, current_stock, purchase_price, sale_price')
+				.order('created_at', { ascending: true });
+
+			if (error) {
 				console.error(error);
-				alert('No se pudo agregar la referencia.');
+				alert('No se pudo cargar el inventario.');
+				return;
 			}
-			return false;
-		}
 
-		await cargarInventario();
-		return true;
-	};
+			inventario = data.map(desdeFila);
+			renderizar();
+		};
 
-	const eliminarReferencia = async (id) => {
-		const { error } = await supabase.from('products').delete().eq('id', id);
-		if (error) {
-			console.error(error);
-			alert('No se pudo eliminar la referencia.');
-			return;
-		}
-		await cargarInventario();
-	};
+		const agregarProducto = async (nombre, cantidadInicial, precioCompra, precioVenta) => {
+			const { error } = await supabase.from('products').insert({
+				reference: nombre,
+				initial_quantity: cantidadInicial,
+				current_stock: cantidadInicial,
+				purchase_price: precioCompra,
+				sale_price: precioVenta,
+			});
 
-	const registrarVenta = async (id) => {
-		const { error } = await supabase.rpc('register_sale', {
-			p_product_id: id,
-			p_quantity: 1,
+			if (error) {
+				// 23505 = violación de la restricción unique (referencia repetida)
+				if (error.code === '23505') {
+					alert(`Ya existe una referencia llamada "${nombre}".`);
+				} else {
+					console.error(error);
+					alert('No se pudo agregar la referencia.');
+				}
+				return false;
+			}
+
+			await cargarInventario();
+			return true;
+		};
+
+		const eliminarReferencia = async (id) => {
+			const { error } = await supabase.from('products').delete().eq('id', id);
+			if (error) {
+				console.error(error);
+				alert('No se pudo eliminar la referencia.');
+				return;
+			}
+			await cargarInventario();
+		};
+
+		const registrarVenta = async (id) => {
+			const { error } = await supabase.rpc('register_sale', {
+				p_product_id: id,
+				p_quantity: 1,
+			});
+
+			if (error) {
+				console.error(error);
+				alert(
+					error.message.includes('Stock insuficiente')
+						? 'No quedan unidades disponibles de esta referencia.'
+						: 'No se pudo registrar la venta.'
+				);
+			}
+			// Recargamos siempre: si falló por stock, la pantalla se corrige con el dato real
+			await cargarInventario();
+		};
+
+		// --- Diálogo de confirmación para eliminar ---
+		// Muestra el diálogo y devuelve true si el usuario confirma
+		const confirmarEliminacion = (nombre) =>
+			new Promise((resolver) => {
+				textoEliminar.textContent = `"${nombre}"`;
+				dialogoEliminar.returnValue = '';
+				dialogoEliminar.addEventListener(
+					'close',
+					() => resolver(dialogoEliminar.returnValue === 'confirmar'),
+					{ once: true }
+				);
+				dialogoEliminar.showModal();
+			});
+
+		// Cerrar al tocar fuera de la ventana
+		dialogoEliminar.addEventListener('click', (evento) => {
+			if (evento.target === dialogoEliminar) dialogoEliminar.close();
 		});
 
-		if (error) {
-			console.error(error);
-			alert(
-				error.message.includes('Stock insuficiente')
-					? 'No quedan unidades disponibles de esta referencia.'
-					: 'No se pudo registrar la venta.'
+		// --- Render ---
+		const renderizarResumen = () => {
+			const inicial = inventario.reduce((suma, p) => suma + p.cantidadInicial, 0);
+			const vendidos = inventario.reduce((suma, p) => suma + p.vendidos, 0);
+			totalInicial.textContent = String(inicial);
+			totalVendidos.textContent = String(vendidos);
+			totalDisponibles.textContent = String(inicial - vendidos);
+		};
+
+		const renderizarContabilidad = () => {
+			// Una referencia sin precio cuenta como 0
+			const inversion = inventario.reduce(
+				(suma, p) => suma + (p.precioCompra ?? 0) * p.cantidadInicial,
+				0
 			);
-		}
-		// Recargamos siempre: si falló por stock, la pantalla se corrige con el dato real
-		await cargarInventario();
-	};
+			const ventas = inventario.reduce(
+				(suma, p) => suma + (p.precioVenta ?? 0) * p.vendidos,
+				0
+			);
+			// La parte de lo vendido que repone lo que costó
+			const recuperacion = inventario.reduce(
+				(suma, p) => suma + (p.precioCompra ?? 0) * p.vendidos,
+				0
+			);
+			const rentabilidad = ventas - recuperacion;
 
-	const renderizarResumen = () => {
-		const inicial = inventario.reduce((suma, p) => suma + p.cantidadInicial, 0);
-		const vendidos = inventario.reduce((suma, p) => suma + p.vendidos, 0);
-		totalInicial.textContent = String(inicial);
-		totalVendidos.textContent = String(vendidos);
-		totalDisponibles.textContent = String(inicial - vendidos);
-	};
+			totalInversion.textContent = mostrarDinero(inversion);
+			totalVentas.textContent = mostrarDinero(ventas);
+			totalRecuperacion.textContent = mostrarDinero(recuperacion);
+			totalRentabilidad.textContent = mostrarDinero(rentabilidad);
 
-	const renderizarProducto = (producto) => {
-		const disponibles = calcularDisponibles(producto);
-		const nodo = plantilla.content.firstElementChild.cloneNode(true);
+			// Verde si hay ganancia, rojo si se vendió por debajo del costo
+			totalRentabilidad.classList.toggle('text-emerald-700', rentabilidad > 0);
+			totalRentabilidad.classList.toggle('text-rose-600', rentabilidad < 0);
+			totalRentabilidad.classList.toggle('text-stone-900', rentabilidad === 0);
+		};
 
-		nodo.dataset.agotado = disponibles <= 0 ? 'true' : 'false';
-		nodo.querySelector('.producto__nombre').textContent = producto.nombre;
-		nodo.querySelector('.producto__inicial').textContent = String(producto.cantidadInicial);
-		nodo.querySelector('.producto__vendidos').textContent = String(producto.vendidos);
-		nodo.querySelector('.producto__disponibles').textContent = String(disponibles);
+		const renderizarProducto = (producto) => {
+			const disponibles = calcularDisponibles(producto);
+			const nodo = plantilla.content.firstElementChild.cloneNode(true);
 
-		const botonVender = nodo.querySelector('.producto__vender');
-		botonVender.disabled = disponibles <= 0;
-		botonVender.addEventListener('click', async () => {
-			botonVender.disabled = true; // evita doble clic mientras responde el servidor
-			await registrarVenta(producto.id);
-		});
+			nodo.dataset.agotado = disponibles <= 0 ? 'true' : 'false';
+			nodo.querySelector('.producto__nombre').textContent = producto.nombre;
+			nodo.querySelector('.producto__inicial').textContent = String(producto.cantidadInicial);
+			nodo.querySelector('.producto__vendidos').textContent = String(producto.vendidos);
+			nodo.querySelector('.producto__disponibles').textContent = String(disponibles);
+			nodo.querySelector('.producto__precio-compra').textContent = mostrarPrecio(producto.precioCompra);
+			nodo.querySelector('.producto__precio-venta').textContent = mostrarPrecio(producto.precioVenta);
 
-		nodo.querySelector('.producto__eliminar').addEventListener('click', async () => {
-			if (confirm(`¿Eliminar "${producto.nombre}" del inventario?`)) {
-				await eliminarReferencia(producto.id);
+			const botonVender = nodo.querySelector('.producto__vender');
+			botonVender.disabled = disponibles <= 0;
+			botonVender.addEventListener('click', async () => {
+				botonVender.disabled = true; // evita doble clic mientras responde el servidor
+				await registrarVenta(producto.id);
+			});
+
+			nodo.querySelector('.producto__eliminar').addEventListener('click', async () => {
+				if (await confirmarEliminacion(producto.nombre)) {
+					await eliminarReferencia(producto.id);
+				}
+			});
+
+			return nodo;
+		};
+
+		const renderizar = () => {
+			const visibles = productosVisibles();
+			listaProductos.innerHTML = '';
+			visibles.forEach((producto) => listaProductos.appendChild(renderizarProducto(producto)));
+
+			if (inventario.length === 0) {
+				inventarioVacio.textContent = 'Aún no has agregado referencias al inventario.';
+				inventarioVacio.hidden = false;
+			} else if (visibles.length === 0) {
+				inventarioVacio.textContent = `Sin resultados para "${filtro}".`;
+				inventarioVacio.hidden = false;
+			} else {
+				inventarioVacio.hidden = true;
+			}
+
+			renderizarResumen();
+			renderizarContabilidad();
+		};
+
+		// --- Eventos del formulario, buscador y orden ---
+		formulario.addEventListener('submit', async (evento) => {
+			evento.preventDefault();
+
+			const nombre = inputNombre.value.trim();
+			const cantidadInicial = Math.floor(Number(inputCantidad.value));
+			const precioCompra = leerPrecio(inputPrecioCompra);
+			const precioVenta = leerPrecio(inputPrecioVenta);
+
+			if (!nombre || !Number.isFinite(cantidadInicial) || cantidadInicial < 0) return;
+
+			const boton = formulario.querySelector('button[type="submit"]');
+			boton.disabled = true;
+			const guardado = await agregarProducto(nombre, cantidadInicial, precioCompra, precioVenta);
+			boton.disabled = false;
+
+			if (guardado) {
+				formulario.reset();
+				inputCantidad.value = '1';
+				inputNombre.focus();
 			}
 		});
 
-		return nodo;
-	};
+		buscador.addEventListener('input', () => {
+			filtro = buscador.value;
+			renderizar();
+		});
 
-	const renderizar = () => {
-		listaProductos.innerHTML = '';
-		inventario.forEach((producto) => listaProductos.appendChild(renderizarProducto(producto)));
-		inventarioVacio.hidden = inventario.length > 0;
-		renderizarResumen();
-	};
+		selectorOrden.addEventListener('change', () => {
+			orden = selectorOrden.value;
+			renderizar();
+		});
 
-	formulario.addEventListener('submit', async (evento) => {
-		evento.preventDefault();
+		// --- Realtime ---
+		// Aplica un cambio que llegó desde Supabase. Usa valores absolutos,
+		// así que recibir dos veces el mismo cambio no duplica nada.
+		const aplicarCambio = (payload) => {
+			if (payload.eventType === 'DELETE') {
+				inventario = inventario.filter((p) => p.id !== payload.old.id);
+			} else {
+				const producto = desdeFila(payload.new);
+				const indice = inventario.findIndex((p) => p.id === producto.id);
+				if (indice === -1) inventario.push(producto);
+				else inventario[indice] = producto;
+			}
+			renderizar();
+		};
 
-		const nombre = inputNombre.value.trim();
-		const cantidadInicial = Math.floor(Number(inputCantidad.value));
+		// --- Login y sesión ---
+		const loginBox = document.getElementById('login');
+		const app = document.getElementById('app');
+		const formLogin = document.getElementById('form-login');
+		const errorLogin = document.getElementById('error-login');
+		const botonLogin = document.getElementById('boton-login');
+		let canal = null;
 
-		if (!nombre || !Number.isFinite(cantidadInicial) || cantidadInicial < 0) return;
+		const mostrarApp = async () => {
+			loginBox.hidden = true;
+			app.hidden = false;
+			await cargarInventario();
+			if (!canal) {
+				canal = supabase
+					.channel('inventario')
+					.on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, aplicarCambio)
+					.subscribe();
+			}
+		};
 
-		const boton = formulario.querySelector('button[type="submit"]');
-		boton.disabled = true;
-		const guardado = await agregarProducto(nombre, cantidadInicial);
-		boton.disabled = false;
+		const mostrarLogin = () => {
+			if (canal) {
+				supabase.removeChannel(canal);
+				canal = null;
+			}
+			inventario = [];
+			renderizar();
+			app.hidden = true;
+			loginBox.hidden = false;
+		};
 
-		if (guardado) {
-			formulario.reset();
-			inputCantidad.value = '1';
-			inputNombre.focus();
-		}
-	});
+		formLogin.addEventListener('submit', async (evento) => {
+			evento.preventDefault();
+			errorLogin.textContent = '';
+			botonLogin.disabled = true;
 
-  const desdeFila = (p) => ({
-	  id: p.id,
-	  nombre: p.reference,
-	  cantidadInicial: p.initial_quantity,
-	  vendidos: p.initial_quantity - p.current_stock,
-  });
+			const { error } = await supabase.auth.signInWithPassword({
+				email: document.getElementById('login-email').value.trim(),
+				password: document.getElementById('login-password').value,
+			});
 
-  // Aplica un cambio que llegó desde Supabase. Usa valores absolutos,
-  // así que recibir dos veces el mismo cambio no duplica nada.
-    const aplicarCambio = (payload) => {
-	    if (payload.eventType === 'DELETE') {
-		    inventario = inventario.filter((p) => p.id !== payload.old.id);
-	    } else {
-		      const producto = desdeFila(payload.new);
-		      const indice = inventario.findIndex((p) => p.id === producto.id);
-		      if (indice === -1) inventario.push(producto);
-		      else inventario[indice] = producto;
-	    }
-	    renderizar();
-  };
+			botonLogin.disabled = false;
+			if (error) {
+				errorLogin.textContent = 'Correo o contraseña incorrectos.';
+				return;
+			}
+			formLogin.reset();
+			await mostrarApp();
+		});
 
-supabase
-	.channel('inventario')
-	.on('postgres_changes', { event: '*', schema: 'public', table: 'products' }, aplicarCambio)
-	.subscribe();
+		document.getElementById('btn-salir').addEventListener('click', () => supabase.auth.signOut());
 
-// Si el celular estuvo bloqueado o sin señal, se pudo perder algún aviso:
-// al volver a la pestaña se vuelve a leer todo.
-    document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') cargarInventario();
-    });
+		// Si la sesión se cierra (botón Salir o sesión vencida), vuelve al login
+		supabase.auth.onAuthStateChange((evento) => {
+			if (evento === 'SIGNED_OUT') mostrarLogin();
+		});
 
-	cargarInventario();
-</script>
+		// Al volver a la pestaña, se vuelve a leer todo por si se perdió algún aviso
+		document.addEventListener('visibilitychange', () => {
+			if (document.visibilityState === 'visible' && !app.hidden) cargarInventario();
+		});
+
+		// Al abrir la página: si ya hay sesión guardada, entra directo
+		const {
+			data: { session },
+		} = await supabase.auth.getSession();
+		if (session) await mostrarApp();
+		else mostrarLogin();
+	</script>
 </Layout>

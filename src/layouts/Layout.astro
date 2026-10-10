@@ -1,11 +1,12 @@
 ---
+import '@fontsource-variable/manrope';
 import '../styles/global.css';
 
 interface Props {
 	title?: string;
 }
 
-const { title = 'Inventario | Feria de emprendimiento' } = Astro.props;
+const { title = 'Control de inventario' } = Astro.props;
 ---
 
 <!doctype html>
@@ -17,7 +18,7 @@ const { title = 'Inventario | Feria de emprendimiento' } = Astro.props;
 		<meta name="description" content="Control sencillo de inventario y ventas para una feria de emprendimiento." />
 		<title>{title}</title>
 	</head>
-	<body class="min-h-screen bg-slate-100 text-slate-800 antialiased">
+	<body class="min-h-screen bg-stone-100 text-stone-900 antialiased">
 		<slot />
 	</body>
 </html>

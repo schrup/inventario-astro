@@ -1,0 +1,33 @@
+---
+---
+
+<div class="flex flex-col gap-2 sm:flex-row sm:items-center">
+	<div class="relative w-full sm:w-64">
+		<svg
+			class="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-stone-400"
+			xmlns="http://www.w3.org/2000/svg"
+			fill="none"
+			viewBox="0 0 24 24"
+			stroke-width="2"
+			stroke="currentColor"
+			aria-hidden="true"
+		>
+			<path stroke-linecap="round" stroke-linejoin="round" d="m21 21-4.35-4.35M17 10.5a6.5 6.5 0 1 1-13 0 6.5 6.5 0 0 1 13 0Z" />
+		</svg>
+		<input
+			type="search"
+			id="buscador"
+			placeholder="Buscar referencia..."
+			autocomplete="off"
+			class="w-full rounded-lg border border-stone-300 bg-white py-2.5 pr-3 pl-9 text-sm outline-none transition focus:border-stone-900"
+		/>
+	</div>
+	<select
+		id="orden"
+		aria-label="Ordenar referencias"
+		class="rounded-lg border border-stone-300 bg-white px-3 py-2.5 text-sm outline-none transition focus:border-stone-900"
+	>
+		<option value="asc">A → Z</option>
+		<option value="desc">Z → A</option>
+	</select>
+</div>
